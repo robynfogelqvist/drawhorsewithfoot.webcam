@@ -1,1 +1,388 @@
-Hej
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webcam Test</title>
+  
+  <style>
+  #webcamVideo {
+  transform: scaleX(-1);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#webcamVideo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;   /* important */
+  transform: scaleX(-1);
+}
+
+
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#webcamVideo {
+  z-index: 1;
+}
+
+canvas {
+  transform: scaleX(-1);
+}
+
+#header {
+  position: fixed;
+  top: 20px;
+  left:50%;
+  transform: translateX(-50%);
+  z-index: 20;
+
+  color: yellow;
+  font-size: 24px;
+  font-family: sans-serif;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+#timer {
+  position: fixed;
+  top: 650px;
+  left: 92%;
+  transform: translateX(-50%);
+  z-index: 20;
+
+  color: black;
+  font-size: 24px;
+  font-family: monospace;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+#toggleCam {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 30;
+  padding: 8px 14px;
+}
+
+#refreshDraw {
+  position: fixed;
+  bottom: 20px;
+  left: 140px; /* pushes it beside Hide camera */
+  z-index: 30;
+  padding: 8px 14px;
+}
+
+#refreshPrompt {
+  position: fixed;
+  bottom: 20px;
+  left: 282px; /* next to other buttons */
+  z-index: 30;
+  padding: 8px 14px;
+}
+
+#infoButton {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 30;
+
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+
+  background: yellow;
+  color: black;
+  font-size: 20px;
+  font-family: sans-serif;
+  font-weight: bold;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+}
+
+#infoBox {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 30;
+  transform: translate(-50%, -50%);
+  width: 460px;
+  padding: 105px;
+
+  background: rgba(255, 255, 255, 0.95);
+  color: black;
+  font-family: sans-serif;
+  font-size: 14px;
+
+  
+ 
+
+  display: none;
+}
+
+#infoToggle:checked + #infoButton + #infoBox {
+  display: block;
+}
+
+
+#infoButton:hover {
+  background: #333;
+}
+
+
+#saveShot {
+  position: fixed;
+  bottom: 20px;
+  left: 400px;
+  z-index: 30;
+  padding: 8px 14px;
+}
+
+  </style>
+  
+</head>
+
+<body>
+
+ <input type="checkbox" id="infoToggle" hidden>
+
+<label for="infoToggle" id="infoButton">i</label>
+
+<div id="infoBox">
+  <h3>Instructions</h3>
+  <p>
+    Move a colored object to draw.<br>
+    Use your foot, elbow, or other body part.<br>
+    Red and blue objects draw separately.<br>
+    Refresh to get a new challenge.
+  </p>
+</div>
+
+
+<video id="webcamVideo" autoplay muted playsinline></video>
+<canvas id="tracker" width="640" height="480" style="display:none;"></canvas>
+<canvas id="draw" width="640" height="480"></canvas>
+
+<button id="toggleCam">Hide camera</button>
+<button id="refreshDraw">Refresh drawing</button>
+<button id="refreshPrompt">New prompt</button>
+<button id="saveShot">Save drawing</button>
+
+<div id="header">
+  Draw HORSE with FOOT
+</div>
+
+
+
+
+
+  <script>
+
+const objects = [
+  "HORSE",
+  "HOUSE",
+  "TREE",
+  "CAT",
+  "KEY",
+  "CAR",
+  "FLOWER",
+  "PERSON",
+  "APPLE",
+  "CLOUD",
+];
+
+const bodyParts = [
+  "FOOT",
+  "ELBOW",
+  "KNEE",
+  "SHOULDER",
+  "HEAD",
+  "HIP",
+  "CHEST",
+  "HAND",
+  "WRIST",
+  "FINGER",
+  "BACK",
+];
+
+
+
+
+
+
+const header = document.getElementById("header");
+
+function newPrompt() {
+  const object =
+    objects[Math.floor(Math.random() * objects.length)];
+
+  const bodyPart =
+    bodyParts[Math.floor(Math.random() * bodyParts.length)];
+
+  header.textContent = `draw ${object} with ${bodyPart}`;
+}
+
+
+const promptBtn = document.getElementById("refreshPrompt");
+
+promptBtn.onclick = () => {
+  newPrompt();
+};
+
+
+
+
+
+
+
+const video = document.getElementById("webcamVideo");
+const trackerCanvas = document.getElementById("tracker");
+const trackerCtx = trackerCanvas.getContext("2d");
+
+const drawCanvas = document.getElementById("draw");
+const drawCtx = drawCanvas.getContext("2d");
+
+// Start webcam
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then((stream) => {
+    video.srcObject = stream;
+  })
+  .catch((error) => {
+    console.error("Webcam error:", error);
+  });
+
+// Start tracking once video is ready
+video.addEventListener("playing", () => {
+  // Match canvas size to video
+  trackerCanvas.width = video.videoWidth;
+  trackerCanvas.height = video.videoHeight;
+  drawCanvas.width = video.videoWidth;
+  drawCanvas.height = video.videoHeight;
+
+  trackColors();
+});
+
+// Main tracking loop
+function trackColors() {
+  // Draw video frame to hidden canvas
+  trackerCtx.drawImage(video, 0, 0, trackerCanvas.width, trackerCanvas.height);
+  const frame = trackerCtx.getImageData(0, 0, trackerCanvas.width, trackerCanvas.height);
+  const data = frame.data;
+
+  let red = { x: 0, y: 0, count: 0 };
+  let blue = { x: 0, y: 0, count: 0 };
+
+  // Loop through all pixels
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    const pixelIndex = i / 4;
+    const x = pixelIndex % trackerCanvas.width;
+    const y = Math.floor(pixelIndex / trackerCanvas.width);
+
+    // Red detection
+    if (r > 150 && g < 80 && b < 80) {
+      red.x += x;
+      red.y += y;
+      red.count++;
+    }
+
+    // Blue detection
+    if (b > 147 && r < 71 && g < 111) {
+      blue.x += x;
+      blue.y += y;
+      blue.count++;
+    }
+  }
+
+  // Draw red dot
+  if (red.count > 100) {
+    drawDot(red.x / red.count, red.y / red.count, "red");
+  }
+
+  // Draw blue dot
+  if (blue.count > 100) {
+    drawDot(blue.x / blue.count, blue.y / blue.count, "blue");
+  }
+
+  requestAnimationFrame(trackColors);
+}
+
+// Draw function that supports any color
+function drawDot(x, y, color) {
+  drawCtx.fillStyle = color;
+  drawCtx.beginPath();
+  drawCtx.arc(x, y, 6, 0, Math.PI * 2);
+  drawCtx.fill();
+}
+
+
+// update once per second
+setInterval(updateTimer, 1000);
+
+const toggleBtn = document.getElementById("toggleCam");
+
+let camVisible = true;
+
+toggleBtn.onclick = () => {
+  camVisible = !camVisible;
+  video.style.opacity = camVisible ? "1" : "0";
+  toggleBtn.textContent = camVisible ? "Hide camera" : "Show camera";
+};
+
+const refreshBtn = document.getElementById("refreshDraw");
+
+refreshBtn.onclick = () => {
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+};
+
+let lastPrompt = "";
+
+function newPrompt() {
+  let prompt;
+  do {
+    const object = objects[Math.floor(Math.random() * objects.length)];
+    const bodyPart = bodyParts[Math.floor(Math.random() * bodyParts.length)];
+    prompt = `draw ${object} with ${bodyPart}`;
+  } while (prompt === lastPrompt);
+
+  lastPrompt = prompt;
+  header.textContent = prompt;
+}
+
+const saveBtn = document.getElementById("saveShot");
+
+saveBtn.onclick = () => {
+  const link = document.createElement("a");
+  link.download = "drawing.png";
+  link.href = drawCanvas.toDataURL("image/png");
+  link.click();
+};
+
+  </script>
+</body>
+</html>
