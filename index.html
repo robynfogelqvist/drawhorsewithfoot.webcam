@@ -39,6 +39,16 @@ canvas {
   pointer-events: none;
 }
 
+#tracker,
+#draw {
+  pointer-events: none;
+}
+
+
+button {
+  pointer-events: auto;
+}
+
 #webcamVideo {
   z-index: 1;
 }
@@ -341,8 +351,7 @@ function drawDot(x, y, color) {
 }
 
 
-// update once per second
-setInterval(updateTimer, 1000);
+
 
 const toggleBtn = document.getElementById("toggleCam");
 
